@@ -1,4 +1,3 @@
-
 package com.example.destination.data
 
 import com.example.destination.models.*

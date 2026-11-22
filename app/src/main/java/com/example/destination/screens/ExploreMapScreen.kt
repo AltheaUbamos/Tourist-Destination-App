@@ -1,5 +1,4 @@
 
-
 package com.example.destination.screens
 
 import android.content.Intent
@@ -14,14 +13,8 @@ import com.example.destination.models.Destination
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.*
 
-// Predefined coordinates for tourist destinations
 private val destinationCoordinates = mapOf(
     "Fortune Island" to LatLng(14.0637, 120.6210),
     "Calayo Beach" to LatLng(14.1530, 120.5900),
@@ -42,6 +35,20 @@ private val destinationCoordinates = mapOf(
     "Ligtasin Cove Eco-Tours" to LatLng(13.9800, 120.6650)
 )
 
+// Normalize names so extra spaces, punctuation and capitalization
+// won't prevent coordinate matching.
+private fun normalizeDestinationName(name: String): String {
+    return name.lowercase().filter { it.isLetterOrDigit() }
+}
+
+// Alternate destination names
+private val destinationAliases = mapOf(
+    "Mt. Batulao" to "Mount Batulao",
+    "Mt Batulao" to "Mount Batulao",
+    "Mt. Talamitam" to "Mount Talamitam",
+    "Mt Talamitam" to "Mount Talamitam"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreMapScreen(
@@ -54,16 +61,33 @@ fun ExploreMapScreen(
         mutableStateOf<Destination?>(null)
     }
 
-    // Match each destination with its coordinates
+    // Create a normalized coordinate lookup
+    val coordinateLookup = remember {
+        destinationCoordinates.entries.associate {
+            normalizeDestinationName(it.key) to it.value
+        }
+    }
+
+    val aliasLookup = remember {
+        destinationAliases.mapKeys {
+            normalizeDestinationName(it.key)
+        }.mapValues {
+            normalizeDestinationName(it.value)
+        }
+    }
+
+    // Match destinations with coordinates, even if names vary slightly
     val locations = remember(destinations) {
         destinations.mapNotNull { destination ->
-            destinationCoordinates[destination.name]?.let { coordinate ->
+            val normalized = normalizeDestinationName(destination.name)
+            val canonicalName = aliasLookup[normalized] ?: normalized
+
+            coordinateLookup[canonicalName]?.let { coordinate ->
                 destination to coordinate
             }
         }
     }
 
-    // Initial map camera position
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(
             LatLng(14.0550, 120.6650),
@@ -71,16 +95,16 @@ fun ExploreMapScreen(
         )
     }
 
-    // Zoom into selected destination
+    // Zoom when a destination marker is selected
     LaunchedEffect(selectedDestination) {
         val selected = locations.firstOrNull {
             it.first.id == selectedDestination?.id
         }
 
-        if (selected != null) {
+        selected?.let {
             cameraPositionState.animate(
                 CameraUpdateFactory.newLatLngZoom(
-                    selected.second,
+                    it.second,
                     15f
                 )
             )
@@ -90,9 +114,7 @@ fun ExploreMapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text("Explore Map")
-                },
+                title = { Text("Explore Map") },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("Back")
@@ -114,7 +136,6 @@ fun ExploreMapScreen(
                 modifier = Modifier.padding(12.dp)
             )
 
-            // Google Map
             GoogleMap(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,20 +156,15 @@ fun ExploreMapScreen(
                 )
             ) {
 
-                // Display destination markers
                 locations.forEach { (destination, position) ->
 
                     key(destination.id) {
-
                         Marker(
                             state = rememberMarkerState(
                                 position = position
                             ),
-
                             title = destination.name,
-
                             snippet = destination.location,
-
                             onClick = {
                                 selectedDestination = destination
                                 true
@@ -158,7 +174,7 @@ fun ExploreMapScreen(
                 }
             }
 
-            // Selected destination information
+            // Display selected destination
             selectedDestination?.let { destination ->
 
                 Card(
@@ -172,30 +188,31 @@ fun ExploreMapScreen(
                     ) {
 
                         Text(
-                            text = destination.name,
+                            destination.name,
                             style = MaterialTheme.typography.titleLarge
                         )
 
-                        Text(
-                            text = destination.location
-                        )
+                        Text(destination.location)
 
-                        Spacer(
-                            modifier = Modifier.height(12.dp)
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
                             onClick = {
-                                val mapUri = Uri.parse(
-                                    destination.mapUrl
+                                val uri = if (destination.mapUrl.isNotBlank()) {
+                                    Uri.parse(destination.mapUrl)
+                                } else {
+                                    Uri.parse(
+                                        "https://www.google.com/maps/search/?api=1&query=" +
+                                                Uri.encode(destination.name)
+                                    )
+                                }
+
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    uri
                                 )
 
-                                context.startActivity(
-                                    Intent(
-                                        Intent.ACTION_VIEW,
-                                        mapUri
-                                    )
-                                )
+                                context.startActivity(intent)
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -213,7 +230,19 @@ fun ExploreMapScreen(
                 }
             }
 
-            // Number of displayed destinations
+            // Feedback when no destinations have matching coordinates
+            if (locations.isEmpty()) {
+                Text(
+                    text = if (destinations.isEmpty()) {
+                        "No destinations available."
+                    } else {
+                        "No destination markers found. Check destination names."
+                    },
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+
             Text(
                 text = "${locations.size} of ${destinations.size} destinations displayed",
                 modifier = Modifier.padding(12.dp),

@@ -83,29 +83,17 @@ fun AppNavigation() {
                 )
             }
 
-            // EXPLORE MAP
-            composable("map") {
-
-                ExploreMapScreen(
-                    destinations = repository.getDestinations(),
-                    onBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            // NEARBY - ORIGINAL
+            // NEARBY
             composable("nearby") {
                 NearbyPlacesScreen()
             }
 
-            // ITINERARY - ORIGINAL
+            // ITINERARY
             composable("itinerary") {
                 TouristPlansScreen()
             }
 
-
-// FAVORITES
+            // FAVORITES
             composable("favorites") {
 
                 FavoritesScreen(
@@ -122,6 +110,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             // BUDGET PLANNER
             composable("budget") {
 
@@ -132,12 +121,12 @@ fun AppNavigation() {
                 )
             }
 
-            // BUSINESSES - ORIGINAL
+            // BUSINESSES
             composable("businesses") {
                 BusinessesScreen(repository)
             }
 
-            // HOTLINES - ORIGINAL
+            // HOTLINES
             composable("hotlines") {
                 HotlinesScreen(repository)
             }
@@ -152,7 +141,7 @@ fun AppNavigation() {
                 )
             }
 
-            // DESTINATION DETAILS
+            // DESTINATION DETAILS WITH MAP
             composable(
                 route = "destination_details/{destinationId}",
 
@@ -195,8 +184,6 @@ fun DashboardScreen(
         DashboardItem("Home", "⌂", "home"),
 
         DashboardItem("Destinations", "📍", "destinations"),
-
-        DashboardItem("Explore Map", "🗺️", "map"),
 
         DashboardItem("Nearby", "🧭", "nearby"),
 
